@@ -1,0 +1,12 @@
+import { initial, play } from './engine';
+import type { Position, Side } from './engine';
+export interface Profile { id:string; name:string; color:string }
+export interface Match { id:string; date:string; mode:'ai'|'local'; level:number; black:string; white:string; blackName:string; whiteName:string; human:Side; positions:Position[]; assisted:boolean }
+export interface Data { version:1; profiles:Profile[]; history:Match[]; current:Match; lang:string }
+export function createMatch(mode:'ai'|'local'='ai',level=5,human:Side=1,black='p1',white='ai',blackName='Player 1',whiteName='MindDev25 AI'):Match {return{id:crypto.randomUUID(),date:new Date().toISOString(),mode,level,human,black,white,blackName,whiteName,positions:[initial()],assisted:false};}
+export function defaults():Data{return{version:1,profiles:[{id:'p1',name:'Player 1',color:'#d8775d'},{id:'p2',name:'Player 2',color:'#688875'}],history:[],current:createMatch(),lang:navigator.language.slice(0,2)}};
+export function validMatch(m:Match){if(!m||!Array.isArray(m.positions)||m.positions.length<1||m.positions.length>61||!['ai','local'].includes(m.mode)||!Number.isInteger(m.level)||m.level<1||m.level>10||![1,-1].includes(m.human))return false;for(const key of ['id','date','black','white','blackName','whiteName'] as const)if(typeof m[key]!=='string')return false;let s=initial();if(JSON.stringify(s)!==JSON.stringify(m.positions[0]))return false;try{for(const p of m.positions.slice(1)){if(!Number.isInteger(p.move))return false;s=play(s,p.move!);if(JSON.stringify(s)!==JSON.stringify(p))return false;}}catch{return false;}return true;}
+export function validate(d:Data){return d?.version===1&&Array.isArray(d.profiles)&&d.profiles.length>0&&d.profiles.length<=30&&d.profiles.every(p=>typeof p.id==='string'&&typeof p.name==='string'&&p.name.length>0&&p.name.length<=30&&/^#[0-9a-f]{6}$/i.test(p.color))&&new Set(d.profiles.map(p=>p.id)).size===d.profiles.length&&Array.isArray(d.history)&&d.history.length<=200&&d.history.every(m=>validMatch(m)&&m.positions.at(-1)?.over)&&validMatch(d.current);}
+export const storageKey='minddev25-reversi:v1';
+export function load():Data{try{const d=JSON.parse(localStorage.getItem(storageKey)||'null');if(validate(d))return d;}catch{/* unavailable or invalid storage */}return defaults();}
+export function save(d:Data){try{localStorage.setItem(storageKey,JSON.stringify(d));return true;}catch{return false;}}
